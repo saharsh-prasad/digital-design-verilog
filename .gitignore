@@ -4,3 +4,4 @@
 sim.out
 .DS_Store
 Thumbs.db
+!FSM/waveform/fsm_sim.vcd
