@@ -3,7 +3,7 @@ module codedetector (
     input  wire reset,
     input  wire s, r, g, b,
     output wire a,
-    output reg  output_signal
+    output reg  unlock
 );
 
     localparam [2:0] S0 = 3'b000, //initial state
@@ -11,9 +11,11 @@ module codedetector (
                      S2 = 3'b010, // s,r pressed
                      S3 = 3'b011, // s,r,b pressed
                      S4 = 3'b100, // s,r,b,g pressed
-                     S5 = 3'b101; // success state
-
+                     S5 = 3'b101, // success state
+                     Locked = 3'b110; // Locked state
     reg [2:0] state, next_state;
+    reg[2:0] wrong_button_count; // Counter for wrong button presses
+    reg[3:0] timeout_counter; // Counter for timeout mechanism
 
     // "Any button pressed" flag
     assign a = s | r | g | b;
@@ -22,11 +24,27 @@ module codedetector (
     always @(posedge clk) begin
         if (reset) begin
             state <= S0; // Reset to initial state
+            wrong_button_count <= 0; // Reset wrong button counter
+            timeout_counter <= 0; // Reset timeout counter
         end else begin
-            state <= next_state;
+            // Timeout logic
+            if (a) timeout_counter <= 0; // Reset timeout counter on any button press
+            else if (state != S0 && state != Locked) begin
+                if (timeout_counter >= 8) timeout_counter <= 0;
+                else timeout_counter <= timeout_counter + 1;
+                end
+                else begin
+                    timeout_counter <= 0;
+                    end
+           //  Wrong button counter 
+        if (state == S5) wrong_button_count <= 0; // Reset wrong button counter on success
+        else if (a && (next_state == S0) && (state != S0) && (state != Locked)) begin
+            wrong_button_count <= wrong_button_count + 1;
+            end
+           // State update
+        state <= next_state;
         end
     end
-
     // 2. Combinational Block: Next State Logic
     always @(*) begin
         // Default assignments to prevent latches
@@ -63,20 +81,27 @@ module codedetector (
                 if (s && !r && !g && !b) next_state = S1;
                 else if (a)              next_state = S0;
             end
+            Locked: next_state = Locked; // Stay locked indefinitely
             default: next_state = S0;
         endcase
+        if (wrong_button_count >= 3) begin
+            next_state = Locked; // Transition to locked state after 3 wrong presses
+        end
+        if (timeout_counter >= 8 && state != S0 && state != Locked)
+            next_state = S0; // Reset to initial state on timeout
     end
 
     // 3. Sequential Block: Registered Output
     always @(posedge clk) begin
         if (reset) begin
-            output_signal <= 1'b0;
-        end else if (next_state == S5) begin
-            output_signal <= 1'b1;
+            unlock <= 1'b0;
+        end else if (state == S5) begin
+            unlock <= 1'b1;
+        end else if (state == Locked) begin
+            unlock <= 1'b0; // Ensure output is low in locked state
         end else begin
-            output_signal <= 1'b0;
+            unlock <= 1'b0;
         end
     end
-
 endmodule
 
