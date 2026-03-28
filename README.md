@@ -1,2 +1,2 @@
 # digital-design-verilog
-Verilog implementations of ALU, FSM and ASMD
+Verilog implementations of 16-bit Parameterized ALU and FSM Digital Security Lock 
